@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zender v2</title>
+
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <link
+      rel="shortcut icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
+  </head>
+
+  <body>
+    <h1>ZENDER v2</h1>
+    <div class="container">
+
+      <ul class="path-container">
+        {% for i, d in enumerate(dir.split("\\")[:-1]) %}
+        <li class="path-name-wrapper">
+          <a href="/{{ get_path_of_dir(i+1, dir) }}" class="path-name">{{ d }}</a>
+        </li>
+        <li>
+          <span class="path-name">\</span>
+        </li>
+        {% endfor %}
+        <li class="path-name-wrapper">
+          <a href="/{{ dir }}" class="path-name">{{ dir.split("\\")[-1] }}</a>
+        </li>
+      </ul>
+
+        <hr>
+
+      <div class="files-wrapper">
+        <div class="file-container">
+          <a href="{{"/" + change_path(dir, "..")}}">
+            <img class="file-icon" src="/static/files-icon/dark-theme/back-icon.png">
+            <p class="file-name">Back</p>
+          </a>
+        </div>
+
+        {% for to_dir in dirs %}
+        <div class="file-container">
+          <a href="{{"/" + change_path(dir, to_dir)}}">
+            <img class="file-icon" src="/static/files-icon/dark-theme/folder-icon.png">
+            <p class="file-name">{{to_dir}}</p>
+          </a>
+        </div>
+        {% endfor %} 
+
+        <hr>
+
+        {% for file in files %}
+        <div action="download" method="POST" class="file-container">
+          <a href="{{"/download/" + change_path(dir, file)}}">
+            <img class="file-icon" src="/static/files-icon/dark-theme/plain-file.png">
+            <p class="file-name">{{file}}</p>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </body>
+</html>
