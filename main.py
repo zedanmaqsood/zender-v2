@@ -1,9 +1,8 @@
-# from importlib.resources import path
-# from email.quoprimime import unquote
-# from turtle import down
-from flask import Flask, redirect, request, render_template, send_file, send_from_directory
-import werkzeug
 import os
+import urllib.parse
+
+from flask import Flask, redirect, render_template, send_file
+import werkzeug
 from flask_restful import reqparse, Api, Resource
 from flask_cors import CORS
 
@@ -23,55 +22,41 @@ CORS(app)
 
 
 def format_dir(raw_dir):
-
-    # this function basically just takes the dir path in the format 'path/to/dir' and change it to 'path\\to\\dir', changing '/' to '\\'.
-    
+    """
+        This function basically just takes the dir path in the format 'path/to/dir',
+        and change it to 'path\\to\\dir', changing '/' to '\\'.
+    """
     split_dir = raw_dir.split('/')
-
     return  "\\".join(split_dir) # returns joining the items in split_dir with '//' in between
 
 
 def change_path(current_path, to_path):
-
-    #This function is called from the jinja HTML thing from index.html when path change is required.
-    
+    """This function is called from the jinja HTML thing from index.html when path change is required."""
     if to_path == "..": # It means go back.
-        
         redirect = current_path.split('\\')
-
         redirect = "\\".join(redirect[:-1])
-
     else:
-
-        redirect = current_path + "\\" + to_path
-
+        to_path_encoded = urllib.parse.quote(to_path)
+        redirect = current_path + "\\" + to_path_encoded
     return redirect
 
 
 def get_path_of_dir(i, dir_name):
-
     dir_list = dir_name.split('\\')[0:i]
-
     dir_path = "\\".join(dir_list[:i])
-
     return dir_path
 
 
 def separate_file_and_dir(path_to_file):
-
     path_split = path_to_file.split('/')
-
     dir_path = "\\".join(path_split[:-1])
-
     file_name = path_split[-1]
-
     return dir_path, file_name
 
 
 #APP call endpoints starts here
 @app.route("/")
 def hello_world():
-
     return redirect(f"/{HOME_PATH}") #Go above to change HOME_PATH
 
 
@@ -102,16 +87,11 @@ def get_directory(dir):
 
 @app.route("/download/<path:path_to_file>", methods=['GET'])
 def download(path_to_file):
-
     dir_path, file_name = separate_file_and_dir(path_to_file)
-
     # print(f"\nPath - {dir_path}\nFile - {file_name}\n")
-        
     try:
         return send_file(path_to_file, download_name=file_name)
-
         # return send_from_directory(dir_path, file_name, as_attachment=True)
-
     except FileNotFoundError:
         return 404
 
@@ -138,11 +118,8 @@ class UploadFiles(Resource):
 # class DownloadFile(Resource):
 
 #     # I don't know why this is still here. 
-
 #     def get(self, dir):
-
 #         filename = f"{dir}"
-        
 #         try:
 #             return send_from_directory(DATABASE, filename, as_attachment=True)
 #         except FileNotFoundError:
@@ -158,9 +135,7 @@ api.add_resource(UploadFiles, '/upload')
 
 # run the app only if __name__ == '__main__'. If you don't know this, please leave. You have no business here. I'm jk ;). This is how we learn.
 if __name__ == '__main__':
-    
     # app.run()  # For LocalHost. Only for debugging. And perhaps for copying files from your own computer. Now, why would you do that?
-
     app.run(host="0.0.0.0") #For Local Network
 
     
