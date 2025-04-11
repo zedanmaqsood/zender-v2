@@ -1,5 +1,7 @@
 import os
 import urllib.parse
+import string
+import ctypes
 
 from flask import Flask, redirect, render_template, send_file
 import werkzeug
@@ -21,24 +23,41 @@ api = Api(app, prefix="/api/")
 CORS(app)
 
 
+def get_drives():
+    """Get all available drives in Windows."""
+    drives = []
+    bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+    for letter in string.ascii_uppercase:
+        if bitmask & 1:
+            drive = f"{letter}:"
+            try:
+                if os.path.exists(drive):
+                    drives.append(drive)
+            except:
+                pass
+        bitmask >>= 1
+    return drives
+
+
 def format_dir(raw_dir):
     """
-        This function basically just takes the dir path in the format 'path/to/dir',
-        and change it to 'path\\to\\dir', changing '/' to '\\'.
+    This function basically just takes the dir path in the format 'path/to/dir',
+    and change it to 'path\\to\\dir', changing '/' to '\\'.
     """
     split_dir = raw_dir.split('/')
-    return  "\\".join(split_dir) # returns joining the items in split_dir with '//' in between
+    return "\\".join(split_dir)
 
 
 def change_path(current_path, to_path):
     """This function is called from the jinja HTML thing from index.html when path change is required."""
+    if not current_path:
+        return to_path
     if to_path == "..": # It means go back.
         redirect = current_path.split('\\')
-        redirect = "\\".join(redirect[:-1])
+        return "\\".join(redirect[:-1])
     else:
         to_path_encoded = urllib.parse.quote(to_path)
-        redirect = current_path + "\\" + to_path_encoded
-    return redirect
+        return current_path + "\\" + to_path_encoded
 
 
 def get_path_of_dir(i, dir_name):
@@ -56,33 +75,29 @@ def separate_file_and_dir(path_to_file):
 
 #APP call endpoints starts here
 @app.route("/")
-def hello_world():
-    return redirect(f"/{HOME_PATH}") #Go above to change HOME_PATH
+def home():
+    drives = get_drives()
+    return render_template('./index.html', files=[], dirs=drives, dir="", change_path=change_path, get_path_of_dir=get_path_of_dir, enumerate=enumerate)
 
 
 @app.route("/<path:dir>")
 def get_directory(dir):
-
-        dir = format_dir(dir) #Perhaps this is useless. I'm too lazy to try. Atleast for now. Using dir as variable is bad btw. Must change.. but later.
+    try:
+        dir = format_dir(dir)
         
         try:
-
             pathWalker = "//".join(dir.split('\\')) + "//" 
-            #what a weird name.
+            os.chdir(pathWalker)
+        except:
+            print("Directory change failed")
 
-            # the below is for that thing were the path doesn't actually change to the required. Happens mostly for F:
-            try:
-                os.chdir(pathWalker)
-            except:
-                print("this is no. one bullshit")
+        files = [f for f in os.listdir(dir) if os.path.isfile(os.path.join(dir, f)) and not os.path.islink(os.path.join(dir, f))]
+        dirs = [f for f in os.listdir(dir) if os.path.isdir(os.path.join(dir, f)) and not os.path.islink(os.path.join(dir, f))]
 
-            files = [f for f in os.listdir(dir) if os.path.isfile(os.path.join(dir, f)) and not os.path.islink(os.path.join(dir, f))]
-            dirs = [f for f in os.listdir(dir) if os.path.isdir(os.path.join(dir, f)) and not os.path.islink(os.path.join(dir, f))]
+        return render_template('./index.html', files=files, dirs=dirs, dir=dir, change_path=change_path, get_path_of_dir=get_path_of_dir, enumerate=enumerate)
 
-            return render_template('./index.html', files=files, dirs=dirs, dir=dir, change_path=change_path, get_path_of_dir=get_path_of_dir, enumerate=enumerate)
-
-        except FileNotFoundError:
-            return 404 # that's sad.
+    except FileNotFoundError:
+        return 404
 
 
 @app.route("/download/<path:path_to_file>", methods=['GET'])
@@ -99,18 +114,26 @@ def download(path_to_file):
 
 #REst API classes
 class UploadFiles(Resource):
-    # @auth.login_required
-    # def get(self):
-    #     return 201
-
     def post(self):
-
         parse = reqparse.RequestParser()
-        parse.add_argument('file', type=werkzeug.datastructures.FileStorage, required=True, location='files')
+        parse.add_argument('files', type=werkzeug.datastructures.FileStorage, required=True, location='files', action='append')
+        parse.add_argument('current_dir', type=str, location='form')
         args = parse.parse_args()
 
-        file = args['file']
-        file.save(os.path.join(DATABASE, file.filename))
+        files = args['files']
+        current_dir = args.get('current_dir', DATABASE)
+
+        if not os.path.exists(current_dir):
+            return {"error": "Directory does not exist"}, 400
+
+        uploaded_files = []
+        for file in files:
+            try:
+                file_path = os.path.join(current_dir, file.filename)
+                file.save(file_path)
+                uploaded_files.append(file.filename)
+            except Exception as e:
+                return {"error": f"Failed to upload {file.filename}: {str(e)}"}, 500
 
         return f"{file.filename} sent successfully", 201
 
