@@ -121,7 +121,9 @@ class UploadFiles(Resource):
         args = parse.parse_args()
 
         files = args['files']
-        current_dir = args.get('current_dir', DATABASE)
+        current_dir_encoded = args.get('current_dir', DATABASE)
+
+        current_dir = urllib.parse.unquote(current_dir_encoded)
 
         if not os.path.exists(current_dir):
             return {"error": "Directory does not exist"}, 400
